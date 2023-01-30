@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>차 파손 비용 견적 AI</title>
+
+  <style>
+  *, ::before, ::after { box-sizing: border-box; }
+  body { margin: 0; }
+  .container { display: flex; flex-direction: column; height: 100vh; }
+  .container .content { width: 100%; margin: auto; }
+
+  p { margin: 0; }
+
+  .flex { display: flex; align-items: center; }
+  .flex .flex-item { display: flex; width: calc(100% - 12.5rem); margin-right: 1rem; padding-bottom: 0.25rem; border-bottom: 2px solid #333; }
+  .flex .flex-item span { white-space: nowrap; }
+
+  form { width: 100%; max-width: 50rem; margin: 0 auto; text-align: center; }
+  form > div { margin: 0.5rem 0; }
+  form #viewer { margin: 0 1rem; font-size: 0; }
+  form #viewer picture { max-width: 6.25rem; margin: 0 auto; }
+  form #viewer picture img { width: 100%; }
+  form #result { margin: 0 1rem; }
+  form #result table { width: 100%; max-width: 25rem; margin: 0 auto; table-layout: fixed; border-spacing: 0; border-collapse: collapse; }
+  form #result picture { max-width: 6.25rem; margin: 0 auto; }
+  form #result picture img { width: 100%; }
+  form #image { display: none; }
+  form label[for] { cursor: pointer; }
+  form #filename { padding: 0 0.5rem; text-overflow: ellipsis; overflow: hidden; }
+  form button { background-color: #333; color: #fff; width: 12.5rem; padding: 0.5rem 1rem; border: none; margin-left: auto; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="container">
+      <div class="content">
+        <form id="uploader">
+          <div id="viewer"></div>
+            <!-- html에 이미지 넣기↓ -->
+            <!-- <img src="./logo3jp.jpg" alt="Main Logo" style="max-width: 50%; height: auto;"> -->
+            <!-- flask에 정적 이미지 넣기↓ -->
+            <img src="{{ url_for('static', filename='images/logo3.png') }}" alt="Main Logo" style="max-width: 50%; height: auto;">
+            <h1 align="center"> 자동차 파손 견적 AI <br> AUTOCAR-XIF </h1>
+            <!--<h2> (오토카-지)</h2>-->
+          <input type="file" id="image" />
+          <div>
+            <p>
+              <label for="image"><br>👉 CLICK HERE 👈</label>
+            </p>
+          </div>
+          <div class="flex">
+            <p class="flex-item">
+              <span>FILE NAME:</span>
+              <span id="filename"></span>
+            </p>
+            <button>SUBMIT</button>
+          </div>
+          <div id="result"></div>
+        </form>
+      </div>
+    </div>
+  </main>
+  <script>
+  const uploader = document.querySelector('#uploader');
+  const result = uploader.querySelector('#result');
+  const viewer = uploader.querySelector('#viewer');
+  const image = uploader.querySelector('#image');
+  const filename = uploader.querySelector('#filename');
+
+  image.addEventListener('input', () => {
+    const file = image.files[0];
+
+    filename.textContent = file.name;
+
+    const link = URL.createObjectURL(file);
+
+    const picture = document.createElement('picture');
+    const preview = new Image;
+    preview.src = link;
+
+    picture.appendChild(preview);
+
+    viewer.innerHTML = '';
+    viewer.appendChild(picture);
+  });
+
+  const withCommas = (number) => number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  uploader.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    if (uploader.busy) {
+      alert('조회중입니다.');
+      return;
+    }
+
+    const file = image.files[0];
+    const formData = new FormData;
+    formData.append('image', file);
+
+    uploader.busy = true;
+
+    result.innerHTML = `조회중...`;
+
+    fetch('/upload', { method: 'POST', body: formData, })
+      .then(response => response.json())
+      .then(data => {
+        result.innerHTML = `
+        <p>손상심각도: ${data.grade}등급</p>
+        <p>고객님, 총 수리비는 ${withCommas(data.total)}원 입니다!</p>
+        <hr/>
+        <table>
+          <thead>
+            <tr>
+              <th>&nbsp;</th>
+              <th>면적</th>
+              <th>가격</th>
+            </tr>
+          </tbody>
+          <tbody>
+            <tr>
+              <th nowrap>Breakage[파손]</th>
+              <td>${data.area.breakage.size}</td>
+              <td>${withCommas(data.area.breakage.price)}원</td>
+            </tr>
+            <tr>
+              <th nowrap>Crushed[찌그러짐]</th>
+              <td>${data.area.crushed.size}</td>
+              <td>${withCommas(data.area.crushed.price)}원</td>
+            </tr>
+            <tr>
+              <th nowrap>Scratch[스크래치]</th>
+              <td>${data.area.scratch.size}</td>
+              <td>${withCommas(data.area.scratch.price)}원</td>
+            </tr>
+            <tr>
+              <th nowrap>Seperated[이격]</th>
+              <td>${data.area.seperated.size}</td>
+              <td>${withCommas(data.area.seperated.price)}원</td>
+            </tr>
+          </tbody>
+        </table>
+        <picture>
+          <img src="data:image/jpeg;base64,${data.image}" />
+        </picture>
+        `;
+      })
+      .finally(() => delete uploader.busy);
+  });
+  </script>
+</body>
+</html>
